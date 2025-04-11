@@ -37,7 +37,7 @@ export const aiService = {
     const imageUrl = URL.createObjectURL(imageFile);
     
     // Random result for demonstration
-    const isPneumonia = Math.random() > 0.5;
+    const isPneumonia = Math.random() = 1;
     
     // Generate a random confidence value between 70% and 99%
     const confidence = 0.7 + Math.random() * 0.29;
