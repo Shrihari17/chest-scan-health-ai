@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import base64
@@ -12,16 +11,28 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)  # Enable CORS with credentials
+CORS(app, supports_credentials=True)
 
-# MySQL Configuration
+# MySQL Configuration - Update these values according to your local MySQL setup
 app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'jit123'  # Change as needed
-app.config['MYSQL_DB'] = 'sample'
+app.config['MYSQL_USER'] = 'root'  # Your MySQL username
+app.config['MYSQL_PASSWORD'] = 'jit123'  # Your MySQL password
+app.config['MYSQL_DB'] = 'sample'  # Your database name
+app.config['MYSQL_CURSORCLASS'] = 'DictCursor'  # This will return results as dictionaries
 
 mysql = MySQL(app)
-app.secret_key = 'your_secret_key'
+app.secret_key = 'your_secret_key'  # Change this to a secure secret key
+
+# Test route to verify database connection
+@app.route('/test-db')
+def test_db():
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute('SELECT 1')
+        cursor.close()
+        return jsonify({'message': 'Database connection successful!'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Load Pneumonia Detection Model
 model = load_model("D:/FINAL YEAR(sample database)/best_model_fold_5.weights (5).h5")
