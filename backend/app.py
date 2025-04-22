@@ -13,17 +13,17 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-# MySQL Configuration - Update these values according to your local MySQL setup
+# MySQL Configuration
 app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'  # Your MySQL username
-app.config['MYSQL_PASSWORD'] = 'jit123'  # Your MySQL password
-app.config['MYSQL_DB'] = 'sample'  # Your database name
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor'  # This will return results as dictionaries
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'jit123'
+app.config['MYSQL_DB'] = 'sample'
+app.config['MYSQL_CURSORCLASS'] = 'DictCursor'  # Return results as dictionaries
 
 mysql = MySQL(app)
 app.secret_key = 'your_secret_key'  # Change this to a secure secret key
 
-# Test route to verify database connection
+# Test database connection
 @app.route('/test-db')
 def test_db():
     try:
@@ -32,6 +32,105 @@ def test_db():
         cursor.close()
         return jsonify({'message': 'Database connection successful!'})
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# User Registration
+@app.route('/register', methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        email = data.get('email')
+        password = data.get('password')  # In production, hash this password
+        dob = data.get('dob')
+        phone = data.get('phone')
+        medical_history = data.get('medicalHistory', '')
+
+        cursor = mysql.connection.cursor()
+        
+        # Check if email already exists
+        cursor.execute('SELECT * FROM patients WHERE email = %s', (email,))
+        if cursor.fetchone():
+            return jsonify({'error': 'Email already registered'}), 400
+
+        # Check if phone already exists
+        cursor.execute('SELECT * FROM patients WHERE phone = %s', (phone,))
+        if cursor.fetchone():
+            return jsonify({'error': 'Phone number already registered'}), 400
+
+        # Insert new user
+        cursor.execute(
+            'INSERT INTO patients (name, email, password_hash, dob, phone, medical_history) VALUES (%s, %s, %s, %s, %s, %s)',
+            (name, email, password, dob, phone, medical_history)
+        )
+        mysql.connection.commit()
+        
+        cursor.close()
+        return jsonify({'message': 'Registration successful'})
+    except Exception as e:
+        print(f"Registration error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# User Login
+@app.route('/login', methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+
+        cursor = mysql.connection.cursor()
+        cursor.execute('SELECT * FROM patients WHERE email = %s AND password_hash = %s', (email, password))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if user:
+            session['user_id'] = user['id']
+            return jsonify({
+                'id': user['id'],
+                'name': user['name'],
+                'email': user['email'],
+                'dob': user['dob'].strftime('%Y-%m-%d') if user['dob'] else None,
+                'phone': user['phone'],
+                'medicalHistory': user['medical_history']
+            })
+        else:
+            return jsonify({'error': 'Invalid email or password'}), 401
+    except Exception as e:
+        print(f"Login error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# Logout
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return jsonify({'message': 'Logged out successfully'})
+
+# Get User Profile
+@app.route('/profile')
+def get_profile():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute('SELECT id, name, email, dob, phone, medical_history FROM patients WHERE id = %s', (session['user_id'],))
+        user = cursor.fetchone()
+        cursor.close()
+
+        if user:
+            return jsonify({
+                'id': user['id'],
+                'name': user['name'],
+                'email': user['email'],
+                'dob': user['dob'].strftime('%Y-%m-%d') if user['dob'] else None,
+                'phone': user['phone'],
+                'medicalHistory': user['medical_history']
+            })
+        else:
+            return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        print(f"Profile error: {e}")
         return jsonify({'error': str(e)}), 500
 
 # Load Pneumonia Detection Model
