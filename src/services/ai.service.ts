@@ -7,6 +7,7 @@ export interface XrayAnalysisResult {
   imageUrl: string;
   timestamp: string;
   reportId: string;
+  reportDownloadUrl?: string;
 }
 
 export interface ChatMessage {
@@ -27,7 +28,7 @@ export const aiService = {
       const response = await fetch(`${FLASK_BASE_URL}/detect`, {
         method: 'POST',
         body: formData,
-        credentials: 'include', // This is important for session handling
+        credentials: 'include', // Important for session handling
       });
       
       if (!response.ok) {
@@ -36,12 +37,16 @@ export const aiService = {
       
       const result = await response.json();
       
+      // Handle the reportDownloadUrl if provided by backend
+      const reportDownloadUrl = result.report_download_url;
+      
       return {
         prediction: result.prediction === "Pneumonia" ? "Pneumonia" : "Normal",
-        confidence: result.confidence || 0.95, // Using default if not provided by backend
-        imageUrl: result.image_url || URL.createObjectURL(imageFile),
+        confidence: result.confidence || 0.95,
+        imageUrl: result.image_url,
         timestamp: new Date().toISOString(),
-        reportId: result.report_id || `REP-${Math.floor(Math.random() * 1000000)}`
+        reportId: result.report_id,
+        reportDownloadUrl: reportDownloadUrl
       };
     } catch (error) {
       console.error('Error analyzing X-ray:', error);
@@ -58,7 +63,7 @@ export const aiService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ message }),
-        credentials: 'include', // This is important for session handling
+        credentials: 'include', // Important for session handling
       });
       
       if (!response.ok) {
@@ -78,4 +83,3 @@ export const aiService = {
     }
   }
 };
-
