@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -9,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
 import { authService } from '@/services/auth.service';
 import { aiService, XrayAnalysisResult } from '@/services/ai.service';
+import { AlertCircle } from 'lucide-react';
 
 const XrayAnalysis = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -16,6 +16,7 @@ const XrayAnalysis = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<XrayAnalysisResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -80,8 +81,9 @@ const XrayAnalysis = () => {
       };
       reader.readAsDataURL(file);
       
-      // Reset previous results
+      // Reset previous results and errors
       setResult(null);
+      setErrorMessage(null);
     }
   };
 
@@ -97,6 +99,7 @@ const XrayAnalysis = () => {
     
     setIsAnalyzing(true);
     setProgress(0);
+    setErrorMessage(null);
     
     try {
       // Process file upload
@@ -117,12 +120,40 @@ const XrayAnalysis = () => {
       
     } catch (error) {
       console.error('Error analyzing X-ray:', error);
+      setIsAnalyzing(false);
+      setProgress(0);
+      
+      // Prepare a helpful error message
+      let errorMsg = "There was an error analyzing your X-ray.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes("Failed to fetch")) {
+          errorMsg = "Could not connect to the prediction server. Please ensure the Flask backend is running on http://localhost:5000.";
+          setErrorMessage(errorMsg);
+        } else {
+          errorMsg += " " + error.message;
+          setErrorMessage(error.message);
+        }
+      }
+      
       toast({
         title: "Analysis Failed",
-        description: "There was an error analyzing your X-ray. Please try again.",
+        description: errorMsg,
         variant: "destructive"
       });
-      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDownloadReport = () => {
+    if (result?.reportDownloadUrl) {
+      // If it's a full URL, navigate to it
+      if (result.reportDownloadUrl.startsWith('http')) {
+        window.open(result.reportDownloadUrl, '_blank');
+      } else {
+        // Otherwise, it's a relative URL - construct the full URL
+        const baseUrl = import.meta.env.VITE_FLASK_API_URL || "http://localhost:5000";
+        window.open(`${baseUrl}${result.reportDownloadUrl}`, '_blank');
+      }
     }
   };
 
@@ -190,6 +221,20 @@ const XrayAnalysis = () => {
                     >
                       Remove
                     </Button>
+                  </div>
+                )}
+                
+                {errorMessage && (
+                  <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-400 text-sm text-red-700">
+                    <div className="flex">
+                      <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+                      <p>
+                        <strong>Connection Error:</strong> {errorMessage}
+                      </p>
+                    </div>
+                    <p className="mt-2 ml-7">
+                      Please make sure your Flask backend is running on localhost:5000, or try enabling mock mode.
+                    </p>
                   </div>
                 )}
                 
@@ -268,7 +313,11 @@ const XrayAnalysis = () => {
                     </div>
                     
                     <div className="text-center">
-                      <Button className="medical-btn-secondary">
+                      <Button 
+                        className="medical-btn-secondary"
+                        onClick={handleDownloadReport}
+                        disabled={!result.reportDownloadUrl}
+                      >
                         Download Report
                       </Button>
                     </div>
@@ -276,12 +325,10 @@ const XrayAnalysis = () => {
                     {result.prediction === 'Pneumonia' && (
                       <div className="bg-red-50 border-l-4 border-red-400 p-4 mt-4">
                         <div className="flex">
-                          <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                          <div className="ml-3">
+                          <svg className="h-5 w-5 text-red-400 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <div>
                             <p className="text-sm text-red-700">
                               This analysis suggests pneumonia may be present. Please consult with a healthcare professional for proper diagnosis and treatment.
                             </p>

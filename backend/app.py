@@ -144,5 +144,15 @@ def get_chat_response(message):
     
     return "I'm here to help with questions about pneumonia. You can ask about symptoms, causes, treatment, prevention, or diagnosis."
 
+# This endpoint allows checking if the Flask server is running
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'ok', 'message': 'Flask server is running'})
+
+# Serve static files
+@app.route('/static/<path:path>')
+def serve_static(path):
+    return send_from_directory('static', path)
+
 if __name__ == '__main__':
     app.run(debug=True)
